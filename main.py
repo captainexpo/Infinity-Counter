@@ -6,8 +6,13 @@ import os
 __import__('dotenv').load_dotenv()
 
 class Counter:
-    def __init__(self, filename: str, starting_value: Optional[int] = None):
-        self.filename = filename
+    def __init__(self, data_folder: str, count_file: str, leaderboard_file: str, starting_value: Optional[int] = None):
+
+        if not os.path.exists(data_folder):
+            os.makedirs(data_folder)
+
+        self.count_file = os.path.join(data_folder, count_file)
+        self.leaderboard_file = os.path.join(data_folder, leaderboard_file)
         self.last_uid = "0"
         if starting_value is not None:
             self.value = starting_value
@@ -15,13 +20,13 @@ class Counter:
         self.value: int = self.read()
 
     def read(self) -> int:
-        if not os.path.exists(self.filename):
+        if not os.path.exists(self.count_file):
             return 0
-        with open(self.filename, 'r') as f:
+        with open(self.count_file, 'r') as f:
             return int(f.read())
 
     def save(self):
-        with open(self.filename, 'w') as f:
+        with open(self.count_file, 'w') as f:
             f.write(str(self.value))
 
     def increment(self):
@@ -33,8 +38,24 @@ class Counter:
         self.last_uid = "0"
         self.save()
 
-    def new_number(self, num: str, uid: str):
 
+    def person_counted(self, uid: str):
+        if not os.path.exists(self.leaderboard_file):
+            open(self.leaderboard_file, 'w').close()
+        with open(self.leaderboard_file, 'r') as f:
+            lines = f.readlines()
+
+        for i, line in enumerate(lines):
+            if line.startswith(uid):
+                lines[i] = f"{uid}:{int(line.split(':')[1]) + 1}\n"
+                break
+        else:
+            lines.append(f"{uid}:1\n")
+
+        with open(self.leaderboard_file, 'w') as f:
+            f.writelines(lines)
+
+    def new_number(self, num: str, uid: str):
         try:
             n_int = int(num)
             if n_int == 1:
@@ -51,6 +72,7 @@ class Counter:
             if n_int == self.value + 1:
                 self.last_uid = uid
                 self.increment()
+                self.person_counted(uid)
                 return True
             else:
                 self.mess_up()
@@ -84,6 +106,10 @@ intents.message_content = True
 
 client = MyClient(intents=intents)
 client.set_counter(
-    Counter('counter.tmp')
+    Counter(
+        './data',
+        'counter.txt',
+        'leaderboard.txt',
+    )
 )
 client.run(os.environ["BOT_TOKEN"])
