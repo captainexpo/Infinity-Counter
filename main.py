@@ -2,8 +2,21 @@
 from typing import Optional
 import discord
 import os
+import dotenv
+import time
 
-__import__('dotenv').load_dotenv()
+dotenv.load_dotenv()
+
+
+def log(message: str) -> bool:
+    try:
+        if not os.path.exists('log.txt'):
+            open('log.txt', 'w').close()
+        with open('log.txt', 'a') as f:
+            f.write(f"{time.time()}: {message}\n")
+        return True
+    except:
+        return False
 
 class Counter:
     def __init__(self, data_folder: str, count_file: str, leaderboard_file: str, starting_value: Optional[int] = None):
@@ -91,7 +104,7 @@ class Counter:
 
         return lines
 
-class MyClient(discord.Client):
+class CounterClient(discord.Client):
 
     def set_counter(self, counter: Counter):
         self.counter = counter
@@ -99,31 +112,36 @@ class MyClient(discord.Client):
     async def on_ready(self):
         print(f'Logged on as {self.user}!')
 
+    async def leaderboard(self, message: discord.Message):
+        board: str =  ""
+        leaderboard = self.counter.get_leaderboard()
+        for i, line in enumerate(leaderboard):
+            uid, count = line.split(':')
+            if message.guild is not None:
+                member = await message.guild.fetch_member(int(uid))
+                board += f"{i + 1}. {member.display_name}: {count}\n"
+        await message.reply(board)
+        return
+
     async def on_message(self, message: discord.Message):
         if message.author.bot: return
         if message.content == "%leaderboard%":
-            board: str =  ""
-            leaderboard = self.counter.get_leaderboard()
-            for i, line in enumerate(leaderboard):
-                uid, count = line.split(':')
-                if message.guild is not None:
-                    member = await message.guild.fetch_member(int(uid))
-                    board += f"{i + 1}. {member.display_name}: {count}\n"
-            await message.reply(board)
+            log(f"{message.author.id} requested leaderboard")
+            await self.leaderboard(message)
             return
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]):
             if self.counter.new_number(message.content, str(message.author.id)):
+                log(f"{message.author.id} counted, said {message.content}")
                 pass
             else:
+                log(f"{message.author.id} messed up, said {message.content}")
                 await message.add_reaction('❌')
-
             return
-        print(f'Message from {message.author}: {message.content}')
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = MyClient(intents=intents)
+client = CounterClient(intents=intents)
 client.set_counter(
     Counter(
         './data',
