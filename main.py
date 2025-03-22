@@ -81,6 +81,13 @@ class Counter:
             self.mess_up()
             return False
 
+    def get_leaderboard(self):
+        with open(self.leaderboard_file, 'r') as f:
+            lines = f.readlines()
+
+        lines.sort(key=lambda x: int(x.split(':')[1]), reverse=True)
+
+        return lines
 
 class MyClient(discord.Client):
 
@@ -92,6 +99,16 @@ class MyClient(discord.Client):
 
     async def on_message(self, message: discord.Message):
         if message.author.bot: return
+        if message.content == "%leaderboard%":
+            board: str =  ""
+            leaderboard = self.counter.get_leaderboard()
+            for i, line in enumerate(leaderboard):
+                uid, count = line.split(':')
+                if message.guild is not None:
+                    member = await message.guild.fetch_member(int(uid))
+                    board += f"{i + 1}. {member.display_name}: {count}\n"
+            await message.reply(board)
+            return
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]):
             if self.counter.new_number(message.content, str(message.author.id)):
                 pass
