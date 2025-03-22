@@ -82,6 +82,8 @@ class Counter:
             return False
 
     def get_leaderboard(self):
+        if not os.path.exists(self.leaderboard_file):
+            open(self.leaderboard_file, 'w').close()
         with open(self.leaderboard_file, 'r') as f:
             lines = f.readlines()
 
