@@ -131,3 +131,5 @@ cython_debug/
 .ropeproject/
 
 data/
+
+log.txt
