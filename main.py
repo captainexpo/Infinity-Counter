@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Optional, Any, Tuple
 import discord
 import os
 import dotenv
@@ -70,21 +70,13 @@ class Counter:
 
     def person_counted(self, uid: str):
         if not os.path.exists(self.leaderboard_file):
-            open(self.leaderboard_file, 'w').close()
-        with open(self.leaderboard_file, 'r') as f:
-            lines = f.readlines()
+            with open(self.leaderboard_file, 'w') as f:
+                f.write("0")
 
-        for i, line in enumerate(lines):
-            if line.startswith(uid):
-                lines[i] = f"{uid}:{int(line.split(':')[1]) + 1}\n"
-                break
-        else:
-            lines.append(f"{uid}:1\n")
 
-        with open(self.leaderboard_file, 'w') as f:
-            f.writelines(lines)
 
-    def new_number(self, num: str, uid: str):
+
+    def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
         try:
             n_int = safe_eval(num)
             if n_int == 1:
@@ -92,43 +84,41 @@ class Counter:
                 self.last_uid = uid
                 self.value = 1
                 self.save()
-                return True
+                return (True, 1)
 
             if uid == self.last_uid:
                 self.mess_up()
-                return False
+                return (False, 0)
 
             if n_int == self.value + 1:
                 self.last_uid = uid
                 self.increment()
                 self.person_counted(uid)
-                return True
+                return (True, n_int)
             else:
                 self.mess_up()
-                return False
+                return (False, 0)
         except ValueError:
             self.mess_up()
-            return False
+            return (False, 0)
 
-    def get_leaderboard(self):
+    def get_best(self) -> int:
         if not os.path.exists(self.leaderboard_file):
-            open(self.leaderboard_file, 'w').close()
+            with open(self.leaderboard_file, 'w') as f: f.write("0")
+            return 200
         with open(self.leaderboard_file, 'r') as f:
-            lines = f.readlines()
-
-        lines.sort(key=lambda x: int(x.split(':')[1]), reverse=True)
-
-        return lines
+            val = int(f.read())
+        return val
 
     async def update_leaderboard(self):
+        best = self.get_best()
+        with open(self.leaderboard_file, 'w') as f:
+            if self.value > best:
+                f.write(str(self.value))
+            else:
+                f.write(str(best))
         if self.leaderboard_message is not None:
-            leaderboard = self.get_leaderboard()
-            board = "Leaderboard:\n"
-            for i, line in enumerate(leaderboard):
-                uid, count = line.split(':')
-                if self.leaderboard_message.guild is not None:
-                    member = await self.leaderboard_message.guild.fetch_member(int(uid))
-                    board += f"{i + 1}. {member.display_name}: {count}\n"
+            board = "Best Score: " + str(self.get_best())
             await self.leaderboard_message.edit(content=board)
 
 class CounterClient(discord.Client):
@@ -139,6 +129,7 @@ class CounterClient(discord.Client):
     async def on_ready(self):
         print(f'Logged on as {self.user}!')
         await self.init_leaderboard(client.get_channel(int(os.environ["BOT_CHANNEL"]))) # type: ignore
+        self.is_best_run = False
 
     async def init_leaderboard(self, chan: discord.TextChannel):
         msg = await chan.send("Leaderboard:")
@@ -147,11 +138,15 @@ class CounterClient(discord.Client):
     async def on_message(self, message: discord.Message):
         if message.author.bot: return
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]):
-            if self.counter.new_number(message.content, str(message.author.id)):
-                log(f"{message.author.id} counted, said {message.content}")
+            if (f:=self.counter.new_number(message.content, str(message.author.id)))[0]:
+                log(f"{message.author.id} counted {f[1]}, said {message.content}")
+                if not self.is_best_run and f[1] > self.counter.get_best():
+                    self.is_best_run = True
+                    await message.add_reaction('🎉')
                 await self.counter.update_leaderboard()
                 pass
             else:
+
                 log(f"{message.author.id} messed up, said {message.content}")
                 await message.add_reaction('❌')
             return
