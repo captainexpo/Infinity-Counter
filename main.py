@@ -108,8 +108,9 @@ class Counter:
         log(f"Best: {best}, Current: {self.value}")
         is_new_best = self.value > best
         if is_new_best or force:
-            with open(self.leaderboard_file, 'w') as f:
-                f.write(str(self.value))
+            if not force:
+                with open(self.leaderboard_file, 'w') as f:
+                    f.write(str(self.value))
             if self.leaderboard_message is not None:
                 board = f"**Best Score: {self.get_best()}**"
                 await self.leaderboard_message.edit(content=board)
