@@ -103,17 +103,18 @@ class Counter:
             val = int(f.read())
         return val
 
-    async def update_leaderboard(self):
+    async def update_leaderboard(self, force: bool = False):
         best = self.get_best()
+        log(f"Best: {best}, Current: {self.value}")
         is_new_best = self.value > best
-        with open(self.leaderboard_file, 'w') as f:
-            if is_new_best:
+        if is_new_best or force:
+            with open(self.leaderboard_file, 'w') as f:
                 f.write(str(self.value))
+            if self.leaderboard_message is not None:
+                board = f"**Best Score: {self.get_best()}**"
+                await self.leaderboard_message.edit(content=board)
             else:
-                f.write(str(best))
-        if self.leaderboard_message is not None and is_new_best:
-            board = f"**Best Score: {self.get_best()}**"
-            await self.leaderboard_message.edit(content=board)
+                log("Leaderboard message not set")
 
 class CounterClient(discord.Client):
     def set_counter(self, counter: Counter):
@@ -127,7 +128,7 @@ class CounterClient(discord.Client):
     async def init_leaderboard(self, chan: discord.TextChannel):
         msg = await chan.send("Best Score:")
         self.counter.set_leaderboard_message(msg)
-        await self.counter.update_leaderboard()
+        await self.counter.update_leaderboard(force=True)
 
     async def on_message(self, message: discord.Message):
         if message.author.bot: return
