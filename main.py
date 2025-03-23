@@ -19,13 +19,13 @@ def log(message: str) -> bool:
 
 def safe_eval(expression: str) -> Any:
     expression.replace("\\*", "*").replace(")(", ")*(").replace("i", "j")
-    allowed = list("0123456789+-*%/().^i")
+    allowed = list("0123456789+-*%/().^i ")
     if all(c in allowed for c in expression):
         try:
             res = eval(expression)
-            if not isinstance(res, int):
-                raise ValueError("Invalid expression")
             log(str(res))
+            if not isinstance(res, int) and not isinstance(res, float) and not isinstance(res, complex):
+                raise ValueError("Invalid expression")
             return res
         except:
             raise ValueError("Invalid expression")
