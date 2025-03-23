@@ -1,5 +1,3 @@
-
-
 from typing import Optional, Any
 import discord
 import os
@@ -20,10 +18,18 @@ def log(message: str) -> bool:
         return False
 
 def safe_eval(expression: str) -> Any:
-    allowed_chars = "0123456789+-*/(). "
-    if not all(char in allowed_chars for char in expression):
-        raise ValueError("Invalid character in expression")
-    return eval(expression)
+    expression.replace("\\*", "*").replace(")(", ")*(").replace("i", "j")
+    allowed = list("0123456789+-*%/().^i")
+    if all(c in allowed for c in expression):
+        try:
+            res = eval(expression)
+            if not isinstance(res, int):
+                raise ValueError("Invalid expression")
+            log(str(res))
+            return res
+        except:
+            raise ValueError("Invalid expression")
+    raise ValueError("Invalid expression")
 
 class Counter:
     def __init__(self, data_folder: str, count_file: str, leaderboard_file: str, starting_value: Optional[int] = None):
