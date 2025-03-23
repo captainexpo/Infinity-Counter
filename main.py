@@ -6,7 +6,6 @@ import time
 
 dotenv.load_dotenv()
 
-
 def log(message: str) -> bool:
     try:
         if not os.path.exists('log.txt'):
@@ -19,8 +18,9 @@ def log(message: str) -> bool:
 
 def safe_eval(expression: str) -> Any:
     expression.replace("\\*", "*").replace(")(", ")*(").replace("i", "j")
-    allowed = list("0123456789+-*%/().^i ")
+    allowed = "0123456789+-*%/().^j "
     if all(c in allowed for c in expression):
+        expression.replace("√", "sqrt").replace("π", "3.1415926535897325").replace("e", "2.718281828459045")
         try:
             res = eval(expression)
             log(str(res))
@@ -35,7 +35,6 @@ class Counter:
     def __init__(self, data_folder: str, count_file: str, leaderboard_file: str, starting_value: Optional[int] = None):
         if not os.path.exists(data_folder):
             os.makedirs(data_folder)
-
         self.count_file = os.path.join(data_folder, count_file)
         self.leaderboard_file = os.path.join(data_folder, leaderboard_file)
         self.last_uid = "0"
@@ -67,14 +66,10 @@ class Counter:
         self.last_uid = "0"
         self.save()
 
-
     def person_counted(self, uid: str):
         if not os.path.exists(self.leaderboard_file):
             with open(self.leaderboard_file, 'w') as f:
                 f.write("0")
-
-
-
 
     def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
         try:
@@ -85,11 +80,9 @@ class Counter:
                 self.value = 1
                 self.save()
                 return (True, 1)
-
             if uid == self.last_uid:
                 self.mess_up()
                 return (False, 0)
-
             if n_int == self.value + 1:
                 self.last_uid = uid
                 self.increment()
@@ -112,17 +105,17 @@ class Counter:
 
     async def update_leaderboard(self):
         best = self.get_best()
+        is_new_best = self.value > best
         with open(self.leaderboard_file, 'w') as f:
-            if self.value > best:
+            if is_new_best:
                 f.write(str(self.value))
             else:
                 f.write(str(best))
-        if self.leaderboard_message is not None:
+        if self.leaderboard_message is not None and is_new_best:
             board = "Best Score: " + str(self.get_best())
             await self.leaderboard_message.edit(content=board)
 
 class CounterClient(discord.Client):
-
     def set_counter(self, counter: Counter):
         self.counter = counter
 
@@ -139,28 +132,28 @@ class CounterClient(discord.Client):
         if message.author.bot: return
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]):
             if (f:=self.counter.new_number(message.content, str(message.author.id)))[0]:
+                await self.counter.update_leaderboard()
                 log(f"{message.author.id} counted {f[1]}, said {message.content}")
                 if not self.is_best_run and f[1] > self.counter.get_best():
                     self.is_best_run = True
                     await message.add_reaction('🎉')
-                await self.counter.update_leaderboard()
                 pass
             else:
-
                 log(f"{message.author.id} messed up, said {message.content}")
                 await message.add_reaction('❌')
             return
 
-intents = discord.Intents.default()
-intents.message_content = True
+if __name__ == "__main__":
+    intents = discord.Intents.default()
+    intents.message_content = True
 
-client = CounterClient(intents=intents)
+    client = CounterClient(intents=intents)
 
-client.set_counter(
-    Counter(
-        './data',
-        'counter.txt',
-        'leaderboard.txt',
+    client.set_counter(
+        Counter(
+            './data',
+            'counter.txt',
+            'leaderboard.txt',
+        )
     )
-)
-client.run(os.environ["BOT_TOKEN"])
+    client.run(os.environ["BOT_TOKEN"])
