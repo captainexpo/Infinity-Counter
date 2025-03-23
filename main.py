@@ -112,7 +112,7 @@ class Counter:
             else:
                 f.write(str(best))
         if self.leaderboard_message is not None and is_new_best:
-            board = "Best Score: " + str(self.get_best())
+            board = f"**Best Score: {self.get_best()}**"
             await self.leaderboard_message.edit(content=board)
 
 class CounterClient(discord.Client):
@@ -125,8 +125,9 @@ class CounterClient(discord.Client):
         self.is_best_run = False
 
     async def init_leaderboard(self, chan: discord.TextChannel):
-        msg = await chan.send("Leaderboard:")
+        msg = await chan.send("Best Score:")
         self.counter.set_leaderboard_message(msg)
+        await self.counter.update_leaderboard()
 
     async def on_message(self, message: discord.Message):
         if message.author.bot: return
