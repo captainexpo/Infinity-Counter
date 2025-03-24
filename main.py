@@ -52,12 +52,14 @@ class Counter:
                 return False
     def set_leaderboard_message(self, msg: Optional[discord.Message] = None, channel: Optional[discord.TextChannel] = None):
         if msg is None:
+            log("Leaderboard message not provided, trying to read from file")
             with open(self.leaderboard_file, 'r') as f:
                 msg_id = f.read().split("|")[1]
             if channel is None:
                 raise ValueError("Channel must be provided if message is None")
             self.leaderboard_message = channel.get_partial_message(int(msg_id)) # type: ignore
         else:
+            log("Leaderboard message provided")
             self.leaderboard_message = msg
         best = self.get_best()
         with open(self.leaderboard_file, 'w') as f:
@@ -135,7 +137,7 @@ class Counter:
             return
 
         best = self.get_best()
-        log(f"Best: {best}, Current: {self.value}")
+        log(f"Updating leaderboard (id={self.leaderboard_message.id})")
         is_new_best = self.value > best
 
         if is_new_best or force:
