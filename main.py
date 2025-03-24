@@ -44,8 +44,25 @@ class Counter:
         self.value: int = self.read()
         self.leaderboard_message: discord.Message|None = None
 
-    def set_leaderboard_message(self, msg: discord.Message):
-        self.leaderboard_message = msg
+    def has_leaderboard_message_saved(self) -> bool:
+        with open(self.leaderboard_file, 'r') as f:
+            try:
+                return len(f.read().split("|")) > 1
+            except:
+                return False
+    def set_leaderboard_message(self, msg: Optional[discord.Message] = None, channel: Optional[discord.TextChannel] = None):
+        if msg is None:
+            with open(self.leaderboard_file, 'r') as f:
+                msg_id = f.read().split("|")[1]
+            if channel is None:
+                raise ValueError("Channel must be provided if message is None")
+            self.leaderboard_message = channel.get_partial_message(int(msg_id)) # type: ignore
+        else:
+            self.leaderboard_message = msg
+        best = self.get_best()
+        with open(self.leaderboard_file, 'w') as f:
+            if self.leaderboard_message is not None:
+                f.write(str(best) + "|" + str(self.leaderboard_message.id))
 
     def read(self) -> int:
         if not os.path.exists(self.count_file):
@@ -95,27 +112,38 @@ class Counter:
             self.mess_up()
             return (False, 0)
 
+    def reset_leaderboard(self):
+        with open(self.leaderboard_file, 'w') as f: f.write("0|")
+
     def get_best(self) -> int:
         if not os.path.exists(self.leaderboard_file):
-            with open(self.leaderboard_file, 'w') as f: f.write("0")
-            return 200
+            self.reset_leaderboard()
+            return 0
         with open(self.leaderboard_file, 'r') as f:
-            val = int(f.read())
+            try:
+                val = int(f.read().split("|")[0])
+            except:
+                log("Leaderboard file is corrupted")
+                self.reset_leaderboard()
+                return self.get_best()
         return val
 
+
     async def update_leaderboard(self, force: bool = False):
+        if self.leaderboard_message is None:
+            log("Leaderboard message not set")
+            return
+
         best = self.get_best()
         log(f"Best: {best}, Current: {self.value}")
         is_new_best = self.value > best
+
         if is_new_best or force:
             if not force:
                 with open(self.leaderboard_file, 'w') as f:
-                    f.write(str(self.value))
-            if self.leaderboard_message is not None:
-                board = f"**Best Score: {self.get_best()}**"
-                await self.leaderboard_message.edit(content=board)
-            else:
-                log("Leaderboard message not set")
+                    f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
+            board = f"**Best Score: {self.get_best()}**"
+            await self.leaderboard_message.edit(content=board)
 
 class CounterClient(discord.Client):
     def set_counter(self, counter: Counter):
@@ -127,8 +155,11 @@ class CounterClient(discord.Client):
         self.is_best_run = False
 
     async def init_leaderboard(self, chan: discord.TextChannel):
-        msg = await chan.send("Best Score:")
-        self.counter.set_leaderboard_message(msg)
+        if not self.counter.has_leaderboard_message_saved():
+            msg = await chan.send("Best Score:")
+            self.counter.set_leaderboard_message(msg=msg)
+        else:
+            self.counter.set_leaderboard_message(channel=chan)
         await self.counter.update_leaderboard(force=True)
 
     async def on_message(self, message: discord.Message):
