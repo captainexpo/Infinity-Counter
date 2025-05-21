@@ -124,6 +124,27 @@ class Counter:
                 return self.get_best()
         return val
 
+    def get_person_leaderboard(self, guild) -> str:
+        if guild is None:
+            log("Guild not found")
+            return ""
+        if not os.path.exists(self.get_people_leaderboard(guild)):
+            os.makedirs(os.path.dirname(self.get_people_leaderboard(guild)), exist_ok=True)
+            open(self.get_people_leaderboard(guild), 'w').close()
+        o = ""
+        with open(self.get_people_leaderboard(guild), 'r') as file:
+            lines = file.readlines()
+            print(lines)
+            for i in sorted(lines, key=lambda x: int(x.split("|")[1]), reverse=True):
+                i = i.strip()
+                id = int(i.split("|")[0])
+                member = f"<@{id}>"
+                if member is None:
+                    log(f"Member not found: {i.split('|')[0]}")
+                    continue
+                o += f"\t{member}: {i.split('|')[1]}\n"
+        return o
+
 
     async def update_leaderboard(self, force: bool = False):
         if self.leaderboard_message is None:
@@ -132,14 +153,16 @@ class Counter:
 
         best = self.get_best()
         log(f"Updating leaderboard (id={self.leaderboard_message.id})")
-        is_new_best = self.value > best
 
-        if is_new_best or force:
-            if not force:
-                with open(self.leaderboard_file, 'w') as f:
-                    f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
-            board = f"**Best Score: {self.get_best()}**"
-            await self.leaderboard_message.edit(content=board)
+        if not force:
+            with open(self.leaderboard_file, 'w') as f:
+                f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
+        board = f"**Best Score: {best}**\n"
+        
+        board += "\n\n**Leaderboard:**\n"
+        board += self.get_person_leaderboard(self.leaderboard_message.guild)
+        
+        await self.leaderboard_message.edit(content=board)
 
 class CounterClient(discord.Client):
     def set_counter(self, counter: Counter):
@@ -180,6 +203,7 @@ class CounterClient(discord.Client):
             self.counter.set_leaderboard_message(channel=chan)
         await self.counter.update_leaderboard(force=True)
 
+
     async def on_message(self, message: discord.Message):
         if message.channel.id == int(os.environ["BOT_CHANNEL"]):
             pass
@@ -193,27 +217,6 @@ class CounterClient(discord.Client):
         #    else:                    
         #        await message.add_reaction('❌')
         #    return
-        if message.content.startswith("?leaderboard?"):
-            if message.guild is None:
-                log("Guild not found")
-                return
-            if not os.path.exists(self.counter.get_people_leaderboard(message.guild)):
-                os.makedirs(os.path.dirname(self.counter.get_people_leaderboard(message.guild)), exist_ok=True)
-                open(self.counter.get_people_leaderboard(message.guild), 'w').close()
-            o = ""
-            with open(self.counter.get_people_leaderboard(message.guild), 'r') as file:
-                lines = file.readlines()
-                print(lines)
-                for i in sorted(lines, key=lambda x: int(x.split("|")[1]), reverse=True):
-                    i = i.strip()
-                    id = int(i.split("|")[0])
-                    member = f"<@{id}>"
-                    if member is None:
-                        log(f"Member not found: {i.split('|')[0]}")
-                        continue
-                    o += f"\t{member}: {i.split('|')[1]}\n"
-            await message.reply(f"Leaderboard:\n{o}")
-            return
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]) and os.environ.get("ENABLE_COUNTING", "1") != "0":
             c = self.counter.value
             if (f:=self.counter.new_number(message.content, str(message.author.id)))[0]:
