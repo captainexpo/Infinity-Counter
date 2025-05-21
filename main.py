@@ -153,7 +153,7 @@ class Counter:
         best = self.get_best()
         log(f"Updating leaderboard (id={self.leaderboard_message.id})")
 
-        if not force:
+        if not force and self.value >= best:
             with open(self.leaderboard_file, 'w') as f:
                 f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
         board = f"**Best Score: {best}**\n"
