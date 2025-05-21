@@ -248,6 +248,7 @@ class CounterClient(discord.Client):
             else:
                 log(f"{message.author.id} messed up, said {message.content}")
                 if c >= 50: await message.reply("Damn that's embarrassing") 
+                if c >= 100: await message.reply("Slert :pensive:")
                 await message.add_reaction('❌')
             return
 
