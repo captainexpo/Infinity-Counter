@@ -77,6 +77,12 @@ class Counter:
         if not os.path.exists(self.leaderboard_file):
             with open(self.leaderboard_file, 'w') as f:
                 f.write("0")
+    def process_number(self, num: str) -> int:
+        idx = num.find("-")
+        if idx == -1:
+            return int(num)
+        else:
+            return int(num[:idx])
 
     def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
         try:
