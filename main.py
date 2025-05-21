@@ -204,7 +204,7 @@ class CounterClient(discord.Client):
             with open(self.counter.get_people_leaderboard(message.guild), 'r') as file:
                 lines = file.readlines()
                 print(lines)
-                for i in lines:
+                for i in sorted(lines, key=lambda x: int(x.split("|")[1]), reverse=True):
                     i = i.strip()
                     id = int(i.split("|")[0])
                     member = f"<@{id}>"
