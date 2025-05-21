@@ -133,3 +133,6 @@ cython_debug/
 data/
 
 log.txt
+
+_NOINCLUDE_*.*
+_data
