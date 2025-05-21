@@ -35,14 +35,14 @@ class Counter:
     def has_leaderboard_message_saved(self) -> bool:
         with open(self.leaderboard_file, 'r') as f:
             try:
-                return len(f.read().split("|")) > 1
+                return len(f.read().strip().split("|")) > 1
             except:
                 return False
     def set_leaderboard_message(self, msg: Optional[discord.Message] = None, channel: Optional[discord.TextChannel] = None):
         if msg is None:
             log("Leaderboard message not provided, trying to read from file")
             with open(self.leaderboard_file, 'r') as f:
-                msg_id = f.read().split("|")[1]
+                msg_id = f.read().strip().split("|")[1]
             if channel is None:
                 raise ValueError("Channel must be provided if message is None")
             self.leaderboard_message = channel.get_partial_message(int(msg_id)) # type: ignore
@@ -58,7 +58,7 @@ class Counter:
         if not os.path.exists(self.count_file):
             return 0
         with open(self.count_file, 'r') as f:
-            return int(f.read())
+            return int(f.read().strip())
 
     def save(self):
         with open(self.count_file, 'w') as f:
@@ -133,8 +133,7 @@ class Counter:
             open(self.get_people_leaderboard(guild), 'w').close()
         o = ""
         with open(self.get_people_leaderboard(guild), 'r') as file:
-            lines = file.readlines()
-            print(lines)
+            lines = file.read().strip().split("\n")
             for i in sorted(lines, key=lambda x: int(x.split("|")[1]), reverse=True):
                 i = i.strip()
                 id = int(i.split("|")[0])
