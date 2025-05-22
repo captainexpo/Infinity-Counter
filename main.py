@@ -209,13 +209,7 @@ class CounterClient(discord.Client):
         if message.author.bot: 
             return
         log(f"{message.author.id} said {message.content} in {message.channel.id} ({message.channel.name})") # type: ignore
-        #if message.content.startswith("!rule"):
-        #    print("Rule channel", message.content)
-        #    if self.rule(message.content[6:]):
-        #        await message.add_reaction('✅')
-        #    else:                    
-        #        await message.add_reaction('❌')
-        #    return
+
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]) and os.environ.get("ENABLE_COUNTING", "1") != "0":
             c = self.counter.value
             if (f:=self.counter.new_number(message.content, str(message.author.id)))[0]:
@@ -244,7 +238,10 @@ class CounterClient(discord.Client):
                     self.is_best_run = True
                     await message.add_reaction('🎉')
                 pass
+                if f[1] == 69:
+                    await message.add_reaction(':pregnant_man:')
             else:
+                self.is_best_run = False
                 log(f"{message.author.id} messed up, said {message.content}")
                 if c >= 50: await message.reply("Damn that's embarrassing") 
                 if c >= 100: await message.reply("Slert :pensive:")
