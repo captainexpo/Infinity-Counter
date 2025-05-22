@@ -141,7 +141,7 @@ class Counter:
                 if member is None:
                     log(f"Member not found: {i.split('|')[0]}")
                     continue
-                o += f"\t{member}: {i.split('|')[1]}\n"
+                o += f"\t{member}: {i.split('|')[1]} ({i.split("|")[2]} fails)\n"
         return o
 
 
@@ -211,43 +211,69 @@ class CounterClient(discord.Client):
         log(f"{message.author.id} said {message.content} in {message.channel.id} ({message.channel.name})") # type: ignore
 
         if message.channel.id == int(os.environ["COUNTER_CHANNEL"]) and os.environ.get("ENABLE_COUNTING", "1") != "0":
-            c = self.counter.value
-            if (f:=self.counter.new_number(message.content, str(message.author.id)))[0]:
-                if message.guild is None:
-                    log("Guild not found")
-                    return
-                if not os.path.exists(self.counter.get_people_leaderboard(message.guild)):
-                    os.makedirs(os.path.dirname(self.counter.get_people_leaderboard(message.guild)), exist_ok=True)
-                    open(self.counter.get_people_leaderboard(message.guild), 'w').close()
-                print("Writing to leaderboard")
-                if f[1] > c and f[1] > 1:
-                    with open(self.counter.get_people_leaderboard(message.guild), 'r+') as file:
-                        lines = file.readlines()
-                        if str(message.author.id) not in [i.split("|")[0] for i in lines]:
-                            file.write(f"{message.author.id}|1|{message.content}\n")
-                        else:
-                            file.seek(0)
-                            file.truncate()
-                            for i in lines:
-                                if str(message.author.id) in i:
-                                    file.write(f"{message.author.id}|{int(i.split('|')[1]) + 1}|{message.content}\n")
-                                else:
-                                    file.write(i)
-                await self.counter.update_leaderboard()
-                log(f"{message.author.id} counted {f[1]}, said {message.content}")
-                if not self.is_best_run and f[1] > self.counter.get_best():
-                    self.is_best_run = True
-                    await message.add_reaction('🎉')
-                pass
-                if f[1] == 69:
-                    await message.add_reaction(':pregnant_man:')
-            else:
-                self.is_best_run = False
-                log(f"{message.author.id} messed up, said {message.content}")
-                if c >= 50: await message.reply("Damn that's embarrassing") 
-                if c >= 100: await message.reply("Slert :pensive:")
-                await message.add_reaction('❌')
+            await self.handle_counting_message(message)
+
+    async def handle_counting_message(self, message: discord.Message):
+        c = self.counter.value
+        result = self.counter.new_number(message.content, str(message.author.id))
+        if result[0]:
+            await self.process_successful_count(message, result[1], c)
+        else:
+            await self.process_failed_count(message, c)
+
+    async def process_successful_count(self, message: discord.Message, new_value: int, prev_value: int):
+        if message.guild is None:
+            log("Guild not found")
             return
+        await self.ensure_leaderboard_file(message.guild)
+        print("Writing to leaderboard")
+        if new_value > prev_value and new_value > 1:
+            self.update_person_leaderboard(message, new_value)
+        await self.counter.update_leaderboard()
+        log(f"{message.author.id} counted {new_value}, said {message.content}")
+        if not self.is_best_run and new_value > self.counter.get_best():
+            self.is_best_run = True
+            await message.add_reaction('🎉')
+        if new_value == 69:
+            await message.add_reaction(':pregnant_man:')
+
+    async def process_failed_count(self, message: discord.Message, prev_value: int):
+        self.is_best_run = False
+        log(f"{message.author.id} messed up, said {message.content}")
+        if prev_value >= 10:
+            # add 1 to the fail count on the leaderboard for this user
+            self.update_person_leaderboard(message, prev_value, is_fail=True)
+        if prev_value >= 50:
+            await message.reply("Damn that's embarrassing") 
+        if prev_value >= 100:
+            await message.reply("Slert :pensive:")
+        await message.add_reaction('❌')
+
+    async def ensure_leaderboard_file(self, guild):
+        leaderboard_path = self.counter.get_people_leaderboard(guild)
+        if not os.path.exists(leaderboard_path):
+            os.makedirs(os.path.dirname(leaderboard_path), exist_ok=True)
+            open(leaderboard_path, 'w').close()
+
+    def update_person_leaderboard(self, message: discord.Message, new_value: int, is_fail: bool = False):
+        leaderboard_path = self.counter.get_people_leaderboard(message.guild)
+        with open(leaderboard_path, 'r+') as file:
+            lines = file.readlines()
+            user_id_str = str(message.author.id)
+            found = False
+            file.seek(0)
+            file.truncate()
+            for line in lines:
+                if user_id_str in line.split("|")[0]:
+                    found = True
+                    parts = line.strip().split("|")
+                    count = int(parts[1]) + 1 if not is_fail else int(parts[1])
+                    fails = int(parts[2]) + 1 if is_fail else int(parts[2])
+                    file.write(f"{user_id_str}|{count}|{fails}\n")
+                else:
+                    file.write(line)
+            if not found:
+                file.write(f"{user_id_str}|1|0\n")
 
 if __name__ == "__main__":
     dotenv.load_dotenv(override=True)
