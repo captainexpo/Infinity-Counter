@@ -158,7 +158,7 @@ class Counter:
                 f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
         board = f"**Best Score: {best}**\n"
         
-        board += "\n\n**Leaderboard:**\n"
+        board += "**Leaderboard:**\n"
         board += self.get_person_leaderboard(self.leaderboard_message.guild)
         
         await self.leaderboard_message.edit(content=board)
@@ -227,6 +227,7 @@ class CounterClient(discord.Client):
                             file.write(f"{message.author.id}|1|{message.content}\n")
                         else:
                             file.seek(0)
+                            file.truncate()
                             for i in lines:
                                 if str(message.author.id) in i:
                                     file.write(f"{message.author.id}|{int(i.split('|')[1]) + 1}|{message.content}\n")
