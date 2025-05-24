@@ -232,7 +232,7 @@ class CounterClient(discord.Client):
         if not self.is_best_run and new_value > self.counter.get_best():
             self.is_best_run = True
             await message.add_reaction('🎉')
-        print(f"New value: {new_value}, CHECKING FOR PREGERT")
+        log(f"New value: {new_value}, CHECKING FOR PREGERT")
         if str(new_value).count("69") > 0:
             await message.add_reaction(':pregnant_man:')
         await self.counter.update_leaderboard()
