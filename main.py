@@ -234,7 +234,7 @@ class CounterClient(discord.Client):
             await message.add_reaction('🎉')
         log(f"New value: {new_value}, CHECKING FOR PREGERT")
         if str(new_value).count("69") > 0:
-            await message.add_reaction(':pregnant_man:')
+            await message.add_reaction('🫃')
         await self.counter.update_leaderboard()
 
     async def process_failed_count(self, message: discord.Message, prev_value: int):
