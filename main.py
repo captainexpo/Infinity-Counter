@@ -226,16 +226,16 @@ class CounterClient(discord.Client):
             log("Guild not found")
             return
         await self.ensure_leaderboard_file(message.guild)
-        print("Writing to leaderboard")
         if new_value > prev_value and new_value > 1:
             self.update_person_leaderboard(message, new_value)
-        await self.counter.update_leaderboard()
         log(f"{message.author.id} counted {new_value}, said {message.content}")
         if not self.is_best_run and new_value > self.counter.get_best():
             self.is_best_run = True
             await message.add_reaction('🎉')
-        if new_value == 69:
+        print(f"New value: {new_value}, CHECKING FOR PREGERT")
+        if str(new_value).count("69") > 0:
             await message.add_reaction(':pregnant_man:')
+        await self.counter.update_leaderboard()
 
     async def process_failed_count(self, message: discord.Message, prev_value: int):
         self.is_best_run = False
