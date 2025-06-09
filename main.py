@@ -93,14 +93,11 @@ class Counter:
                 f.write("0")
 
     def process_number(self, num: str) -> int:
-        if not num.isdigit():
-            # is math expression
-            return numexpr.evaluate(num).item()
-        return int(num)
+        return numexpr.evaluate(num).item()
 
     def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
         try:
-            n_int = int(num)
+            n_int = self.process_number(num)
             if n_int == 1:
                 # Exclude 1 from all rules
                 self.last_uid = uid
@@ -187,10 +184,10 @@ class CounterClient(discord.Client):
         self.counter = counter
 
     async def on_ready(self):
+        self.is_best_run = False
         print(f"Logged on as {self.user}!")
         # type: ignore
         await self.init_leaderboard(client.get_channel(int(os.environ["BOT_CHANNEL"])))
-        self.is_best_run = False
 
         # await self.get_rule()
 
