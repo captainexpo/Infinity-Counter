@@ -1,22 +1,30 @@
-from typing import Optional, Any, Tuple, Callable
+from typing import Optional, Tuple
 import discord
 import os
 import dotenv
 import time
+import numexpr
 
 
 def log(message: str) -> bool:
     try:
-        if not os.path.exists('log.txt'):
-            open('log.txt', 'w').close()
-        with open('log.txt', 'a') as f:
+        if not os.path.exists("log.txt"):
+            open("log.txt", "w").close()
+        with open("log.txt", "a") as f:
             f.write(f"{time.time()}: {message}\n")
         return True
-    except:
+    except Exception as _:
         return False
 
+
 class Counter:
-    def __init__(self, data_folder: str, count_file: str, leaderboard_file: str, starting_value: Optional[int] = None):
+    def __init__(
+        self,
+        data_folder: str,
+        count_file: str,
+        leaderboard_file: str,
+        starting_value: Optional[int] = None,
+    ):
         if not os.path.exists(data_folder):
             os.makedirs(data_folder)
         self.data_folder = data_folder
@@ -27,41 +35,47 @@ class Counter:
             self.value = starting_value
             self.save()
         self.value: int = self.read()
-        self.leaderboard_message: discord.Message|None = None
-        
+        self.leaderboard_message: discord.Message | None = None
+
     def get_people_leaderboard(self, guild) -> str:
         return os.path.join(self.data_folder, f"guilds/leaderboard_{guild.id}.txt")
 
     def has_leaderboard_message_saved(self) -> bool:
-        with open(self.leaderboard_file, 'r') as f:
+        with open(self.leaderboard_file, "r") as f:
             try:
                 return len(f.read().strip().split("|")) > 1
             except:
                 return False
-    def set_leaderboard_message(self, msg: Optional[discord.Message] = None, channel: Optional[discord.TextChannel] = None):
+
+    def set_leaderboard_message(
+        self,
+        msg: Optional[discord.Message] = None,
+        channel: Optional[discord.TextChannel] = None,
+    ):
         if msg is None:
             log("Leaderboard message not provided, trying to read from file")
-            with open(self.leaderboard_file, 'r') as f:
+            with open(self.leaderboard_file, "r") as f:
                 msg_id = f.read().strip().split("|")[1]
             if channel is None:
                 raise ValueError("Channel must be provided if message is None")
-            self.leaderboard_message = channel.get_partial_message(int(msg_id)) # type: ignore
+            self.leaderboard_message = channel.get_partial_message(
+                int(msg_id))  # type: ignore
         else:
             log("Leaderboard message provided")
             self.leaderboard_message = msg
         best = self.get_best()
-        with open(self.leaderboard_file, 'w') as f:
+        with open(self.leaderboard_file, "w") as f:
             if self.leaderboard_message is not None:
                 f.write(str(best) + "|" + str(self.leaderboard_message.id))
 
     def read(self) -> int:
         if not os.path.exists(self.count_file):
             return 0
-        with open(self.count_file, 'r') as f:
+        with open(self.count_file, "r") as f:
             return int(f.read().strip())
 
     def save(self):
-        with open(self.count_file, 'w') as f:
+        with open(self.count_file, "w") as f:
             f.write(str(self.value))
 
     def increment(self):
@@ -75,14 +89,14 @@ class Counter:
 
     def person_counted(self, uid: str):
         if not os.path.exists(self.leaderboard_file):
-            with open(self.leaderboard_file, 'w') as f:
+            with open(self.leaderboard_file, "w") as f:
                 f.write("0")
+
     def process_number(self, num: str) -> int:
-        idx = num.find("-")
-        if idx == -1:
-            return int(num)
-        else:
-            return int(num[:idx])
+        if not num.isdigit():
+            # is math expression
+            return numexpr.evaluate(num).item()
+        return int(num)
 
     def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
         try:
@@ -109,13 +123,14 @@ class Counter:
             return (False, 0)
 
     def reset_leaderboard(self):
-        with open(self.leaderboard_file, 'w') as f: f.write("0|")
+        with open(self.leaderboard_file, "w") as f:
+            f.write("0|")
 
     def get_best(self) -> int:
         if not os.path.exists(self.leaderboard_file):
             self.reset_leaderboard()
             return 0
-        with open(self.leaderboard_file, 'r') as f:
+        with open(self.leaderboard_file, "r") as f:
             try:
                 val = int(f.read().split("|")[0])
             except:
@@ -129,10 +144,12 @@ class Counter:
             log("Guild not found")
             return ""
         if not os.path.exists(self.get_people_leaderboard(guild)):
-            os.makedirs(os.path.dirname(self.get_people_leaderboard(guild)), exist_ok=True)
-            open(self.get_people_leaderboard(guild), 'w').close()
+            os.makedirs(
+                os.path.dirname(self.get_people_leaderboard(guild)), exist_ok=True
+            )
+            open(self.get_people_leaderboard(guild), "w").close()
         o = ""
-        with open(self.get_people_leaderboard(guild), 'r') as file:
+        with open(self.get_people_leaderboard(guild), "r") as file:
             lines = file.read().strip().split("\n")
             for i in sorted(lines, key=lambda x: int(x.split("|")[1]), reverse=True):
                 i = i.strip()
@@ -141,9 +158,9 @@ class Counter:
                 if member is None:
                     log(f"Member not found: {i.split('|')[0]}")
                     continue
-                o += f"\t{member}: {i.split('|')[1]} ({i.split("|")[2]} fails)\n"
+                o += f"\t{member}: {i.split('|')
+                                    [1]} ({i.split('|')[2]} fails)\n"
         return o
-
 
     async def update_leaderboard(self, force: bool = False):
         if self.leaderboard_message is None:
@@ -154,47 +171,32 @@ class Counter:
         log(f"Updating leaderboard (id={self.leaderboard_message.id})")
 
         if not force and self.value >= best:
-            with open(self.leaderboard_file, 'w') as f:
-                f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
+            with open(self.leaderboard_file, "w") as f:
+                f.write(str(self.value) + "|" +
+                        str(self.leaderboard_message.id))
         board = f"**Best Score: {best}**\n"
-        
+
         board += "**Leaderboard:**\n"
         board += self.get_person_leaderboard(self.leaderboard_message.guild)
-        
+
         await self.leaderboard_message.edit(content=board)
+
 
 class CounterClient(discord.Client):
     def set_counter(self, counter: Counter):
         self.counter = counter
 
-    #async def get_rule(self):
-    #    self.rule = lambda s: False
-    #    guild = client.get_guild(int(os.environ["GUILD_ID"]))
-    #    if guild is None:
-    #        log("Guild not found")
-    #        return
-    #    if guild.get_channel(int(os.environ["RULE_CHANNEL"])) is None:
-    #        log("Rule channel not found")
-    #        c = await guild.create_text_channel(
-    #            "secret-rule-2", 
-    #            category=[i for i in guild.categories if i.id == int(os.environ["TEXT_CHANNELS_CATEGORY"])][0],
-    #            topic="Try and guess the secret rule! (Ezra please don't delete this 🥺)"
-    #        )
-    #        log("Rule channel created")
-    #        os.environ["RULE_CHANNEL"] = str(c.id)
-    #    self.rule: Callable[[str], bool] = __import__('_NOINCLUDE_rule').rule
-            
-
     async def on_ready(self):
-        print(f'Logged on as {self.user}!')
-        await self.init_leaderboard(client.get_channel(int(os.environ["BOT_CHANNEL"]))) # type: ignore
+        print(f"Logged on as {self.user}!")
+        # type: ignore
+        await self.init_leaderboard(client.get_channel(int(os.environ["BOT_CHANNEL"])))
         self.is_best_run = False
 
-        #await self.get_rule()
+        # await self.get_rule()
 
     async def init_leaderboard(self, chan: discord.TextChannel):
         if os.path.exists(self.counter.get_people_leaderboard(chan.guild)):
-            open(self.counter.get_people_leaderboard(chan.guild), 'a').close()
+            open(self.counter.get_people_leaderboard(chan.guild), "a").close()
         if not self.counter.has_leaderboard_message_saved():
             msg = await chan.send("Best Score:")
             self.counter.set_leaderboard_message(msg=msg)
@@ -202,26 +204,35 @@ class CounterClient(discord.Client):
             self.counter.set_leaderboard_message(channel=chan)
         await self.counter.update_leaderboard(force=True)
 
-
     async def on_message(self, message: discord.Message):
         if message.channel.id == int(os.environ["BOT_CHANNEL"]):
             pass
-        if message.author.bot: 
+        if message.author.bot:
             return
-        log(f"{message.author.id} said {message.content} in {message.channel.id} ({message.channel.name})") # type: ignore
+        log(
+            f"{message.author.id} said {message.content} in {message.channel.id} ({
+                message.channel.name
+            })"
+        )  # type: ignore
 
-        if message.channel.id == int(os.environ["COUNTER_CHANNEL"]) and os.environ.get("ENABLE_COUNTING", "1") != "0":
+        if (
+            message.channel.id == int(os.environ["COUNTER_CHANNEL"])
+            and os.environ.get("ENABLE_COUNTING", "1") != "0"
+        ):
             await self.handle_counting_message(message)
 
     async def handle_counting_message(self, message: discord.Message):
         c = self.counter.value
-        result = self.counter.new_number(message.content, str(message.author.id))
+        result = self.counter.new_number(
+            message.content, str(message.author.id))
         if result[0]:
             await self.process_successful_count(message, result[1], c)
         else:
             await self.process_failed_count(message, c)
 
-    async def process_successful_count(self, message: discord.Message, new_value: int, prev_value: int):
+    async def process_successful_count(
+        self, message: discord.Message, new_value: int, prev_value: int
+    ):
         if message.guild is None:
             log("Guild not found")
             return
@@ -233,9 +244,9 @@ class CounterClient(discord.Client):
         log(f"{message.author.id} counted {new_value}, said {message.content}")
         if not self.is_best_run and new_value > self.counter.get_best():
             self.is_best_run = True
-            await message.add_reaction('🎉')
+            await message.add_reaction("🎉")
         if new_value == 69:
-            await message.add_reaction(':pregnant_man:')
+            await message.add_reaction(":pregnant_man:")
 
     async def process_failed_count(self, message: discord.Message, prev_value: int):
         self.is_best_run = False
@@ -244,20 +255,22 @@ class CounterClient(discord.Client):
             # add 1 to the fail count on the leaderboard for this user
             self.update_person_leaderboard(message, prev_value, is_fail=True)
         if prev_value >= 50:
-            await message.reply("Damn that's embarrassing") 
+            await message.reply("Damn that's embarrassing")
         if prev_value >= 100:
             await message.reply("Slert :pensive:")
-        await message.add_reaction('❌')
+        await message.add_reaction("❌")
 
     async def ensure_leaderboard_file(self, guild):
         leaderboard_path = self.counter.get_people_leaderboard(guild)
         if not os.path.exists(leaderboard_path):
             os.makedirs(os.path.dirname(leaderboard_path), exist_ok=True)
-            open(leaderboard_path, 'w').close()
+            open(leaderboard_path, "w").close()
 
-    def update_person_leaderboard(self, message: discord.Message, new_value: int, is_fail: bool = False):
+    def update_person_leaderboard(
+        self, message: discord.Message, new_value: int, is_fail: bool = False
+    ):
         leaderboard_path = self.counter.get_people_leaderboard(message.guild)
-        with open(leaderboard_path, 'r+') as file:
+        with open(leaderboard_path, "r+") as file:
             lines = file.readlines()
             user_id_str = str(message.author.id)
             found = False
@@ -275,9 +288,10 @@ class CounterClient(discord.Client):
             if not found:
                 file.write(f"{user_id_str}|1|0\n")
 
+
 if __name__ == "__main__":
     dotenv.load_dotenv(override=True)
-    
+
     intents = discord.Intents.default()
     intents.message_content = True
     intents.guild_messages = True
@@ -287,9 +301,9 @@ if __name__ == "__main__":
 
     client.set_counter(
         Counter(
-            './data',
-            'counter.txt',
-            'leaderboard.txt',
+            "./data",
+            "counter.txt",
+            "leaderboard.txt",
         )
     )
     client.run(os.environ["BOT_TOKEN"])
