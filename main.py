@@ -58,8 +58,7 @@ class Counter:
                 msg_id = f.read().strip().split("|")[1]
             if channel is None:
                 raise ValueError("Channel must be provided if message is None")
-            self.leaderboard_message = channel.get_partial_message(
-                int(msg_id))  # type: ignore
+            self.leaderboard_message = channel.get_partial_message(int(msg_id))  # type: ignore
         else:
             log("Leaderboard message provided")
             self.leaderboard_message = msg
@@ -115,7 +114,8 @@ class Counter:
             else:
                 self.mess_up()
                 return (False, 0)
-        except ValueError:
+        except Exception as e:
+            log(f"Error processing number: {num}, error: {e}")
             self.mess_up()
             return (False, 0)
 
@@ -155,8 +155,7 @@ class Counter:
                 if member is None:
                     log(f"Member not found: {i.split('|')[0]}")
                     continue
-                o += f"\t{member}: {i.split('|')
-                                    [1]} ({i.split('|')[2]} fails)\n"
+                o += f"\t{member}: {i.split('|')[1]} ({i.split('|')[2]} fails)\n"
         return o
 
     async def update_leaderboard(self, force: bool = False):
@@ -169,8 +168,7 @@ class Counter:
 
         if not force and self.value >= best:
             with open(self.leaderboard_file, "w") as f:
-                f.write(str(self.value) + "|" +
-                        str(self.leaderboard_message.id))
+                f.write(str(self.value) + "|" + str(self.leaderboard_message.id))
         board = f"**Best Score: {best}**\n"
 
         board += "**Leaderboard:**\n"
@@ -220,8 +218,7 @@ class CounterClient(discord.Client):
 
     async def handle_counting_message(self, message: discord.Message):
         c = self.counter.value
-        result = self.counter.new_number(
-            message.content, str(message.author.id))
+        result = self.counter.new_number(message.content, str(message.author.id))
         if result[0]:
             await self.process_successful_count(message, result[1], c)
         else:
