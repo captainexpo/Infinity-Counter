@@ -6,6 +6,8 @@ import time
 import numexpr
 import random
 
+from numpy import mod
+
 
 def log(message: str) -> bool:
     try:
@@ -101,35 +103,38 @@ class Counter:
         return numexpr.evaluate(num).item()
 
     def random_chance_to_fuck_with_people(self) -> bool:
-        return int(random.random() * 1_000_000_000_000) == 1
+        num = int(random.random() * 1_000_000_000_000)
+        log("Random num: " + str(num))
+        return num == 1
 
-    def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
+    def new_number(self, num: str, uid: str) -> Tuple[bool, int, str]:
         try:
             if self.random_chance_to_fuck_with_people():
-                raise WrongCountException()
+                self.mess_up()
+                return (False, 0, "random")
             n_int = self.process_number(num)
             if n_int == 1:
                 # Exclude 1 from all rules
                 self.last_uid = uid
                 self.value = 1
                 self.save()
-                return (True, 1)
+                return (True, 1, "")
             if uid == self.last_uid:
                 raise WrongCountException()
             if n_int == self.value + 1:
                 self.last_uid = uid
                 self.increment()
                 self.person_counted(uid)
-                return (True, n_int)
+                return (True, n_int, "")
             else:
                 raise WrongCountException()
         except WrongCountException:
             self.mess_up()
-            return (False, 0)
+            return (False, 0, "")
         except Exception as e:
             log(f"Error processing number: {num}, error: {e}")
             self.mess_up()
-            return (False, 0)
+            return (False, 0, "")
 
     def reset_leaderboard(self):
         with open(self.leaderboard_file, "w") as f:
@@ -228,15 +233,18 @@ class CounterClient(discord.Client):
 
     async def handle_counting_message(self, message: discord.Message):
         c = self.counter.value
-        result = self.counter.new_number(message.content, str(message.author.id))
-        if result[0]:
-            await self.process_successful_count(message, result[1], c)
+        succeded, new_count, modifier = self.counter.new_number(
+            message.content, str(message.author.id)
+        )
+        if succeded:
+            await self.process_successful_count(message, new_count, c, modifier)
         else:
-            await self.process_failed_count(message, c)
+            await self.process_failed_count(message, c, modifier)
 
     async def process_successful_count(
-        self, message: discord.Message, new_value: int, prev_value: int
+        self, message: discord.Message, new_value: int, prev_value: int, modifier: str
     ):
+        _ = modifier
         if message.guild is None:
             log("Guild not found")
             return
@@ -251,17 +259,25 @@ class CounterClient(discord.Client):
             await message.add_reaction("🫃")
         await self.counter.update_leaderboard()
 
-    async def process_failed_count(self, message: discord.Message, prev_value: int):
+    async def process_failed_count(
+        self, message: discord.Message, prev_value: int, modifier: str
+    ):
         self.is_best_run = False
         log(f"{message.author.id} messed up, said {message.content}")
         if prev_value >= 10:
             # add 1 to the fail count on the leaderboard for this user
             self.update_person_leaderboard(message, prev_value, is_fail=True)
-        if prev_value >= 50:
+        if prev_value >= 20:
+            await message.reply("🤡")
+        elif prev_value >= 50:
             await message.reply("Damn that's embarrassing")
-        if prev_value >= 100:
+        elif prev_value >= 100:
             await message.reply("Slert :pensive:")
-        await message.add_reaction("❌")
+
+        if modifier != "random":
+            await message.add_reaction("❌")
+        else:
+            await message.add_reaction("🧙‍♀️")
 
     async def ensure_leaderboard_file(self, guild):
         leaderboard_path = self.counter.get_people_leaderboard(guild)
