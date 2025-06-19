@@ -4,6 +4,7 @@ import os
 import dotenv
 import time
 import numexpr
+import random
 
 
 def log(message: str) -> bool:
@@ -15,6 +16,10 @@ def log(message: str) -> bool:
         return True
     except Exception as _:
         return False
+
+
+class WrongCountException(Exception):
+    pass
 
 
 class Counter:
@@ -44,7 +49,7 @@ class Counter:
         with open(self.leaderboard_file, "r") as f:
             try:
                 return len(f.read().strip().split("|")) > 1
-            except:
+            except Exception as _:
                 return False
 
     def set_leaderboard_message(
@@ -87,6 +92,7 @@ class Counter:
         self.save()
 
     def person_counted(self, uid: str):
+        _ = uid
         if not os.path.exists(self.leaderboard_file):
             with open(self.leaderboard_file, "w") as f:
                 f.write("0")
@@ -94,8 +100,13 @@ class Counter:
     def process_number(self, num: str) -> int:
         return numexpr.evaluate(num).item()
 
+    def random_chance_to_fuck_with_people(self) -> bool:
+        return int(random.random() * 1_000_000_000_000) == 1
+
     def new_number(self, num: str, uid: str) -> Tuple[bool, int]:
         try:
+            if self.random_chance_to_fuck_with_people():
+                raise WrongCountException()
             n_int = self.process_number(num)
             if n_int == 1:
                 # Exclude 1 from all rules
@@ -104,16 +115,17 @@ class Counter:
                 self.save()
                 return (True, 1)
             if uid == self.last_uid:
-                self.mess_up()
-                return (False, 0)
+                raise WrongCountException()
             if n_int == self.value + 1:
                 self.last_uid = uid
                 self.increment()
                 self.person_counted(uid)
                 return (True, n_int)
             else:
-                self.mess_up()
-                return (False, 0)
+                raise WrongCountException()
+        except WrongCountException:
+            self.mess_up()
+            return (False, 0)
         except Exception as e:
             log(f"Error processing number: {num}, error: {e}")
             self.mess_up()
@@ -130,7 +142,7 @@ class Counter:
         with open(self.leaderboard_file, "r") as f:
             try:
                 val = int(f.read().split("|")[0])
-            except:
+            except Exception as _:
                 log("Leaderboard file is corrupted")
                 self.reset_leaderboard()
                 return self.get_best()
@@ -184,9 +196,7 @@ class CounterClient(discord.Client):
     async def on_ready(self):
         self.is_best_run = False
         print(f"Logged on as {self.user}!")
-        # type: ignore
-        await self.init_leaderboard(client.get_channel(int(os.environ["BOT_CHANNEL"])))
-
+        await self.init_leaderboard(client.get_channel(int(os.environ["BOT_CHANNEL"])))  # type: ignore
         # await self.get_rule()
 
     async def init_leaderboard(self, chan: discord.TextChannel):
@@ -206,9 +216,9 @@ class CounterClient(discord.Client):
             return
         log(
             f"{message.author.id} said {message.content} in {message.channel.id} ({
-                message.channel.name
+                message.channel.name  # type: ignore
             })"
-        )  # type: ignore
+        )
 
         if (
             message.channel.id == int(os.environ["COUNTER_CHANNEL"])
@@ -236,7 +246,6 @@ class CounterClient(discord.Client):
         log(f"{message.author.id} counted {new_value}, said {message.content}")
         if not self.is_best_run and new_value > self.counter.get_best():
             self.is_best_run = True
-
             await message.add_reaction("🎉")
         if str(new_value).count("69") > 0:
             await message.add_reaction("🫃")
@@ -263,6 +272,7 @@ class CounterClient(discord.Client):
     def update_person_leaderboard(
         self, message: discord.Message, new_value: int, is_fail: bool = False
     ):
+        _ = new_value
         leaderboard_path = self.counter.get_people_leaderboard(message.guild)
         with open(leaderboard_path, "r+") as file:
             lines = file.readlines()
